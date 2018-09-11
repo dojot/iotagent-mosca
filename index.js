@@ -11,10 +11,8 @@ iota.init();
 // Once a MQTT client is authorized by the server, 
 // its corresponding dojot device is added to the cache
 // and kept there while the client is connected.
-// The clientId which MUST match the pattern tenant/deviceId
+// The clientId which MUST match the pattern tenant:deviceId
 // is used as the cache's key.
-//
-// TODO: Replace the map by a list of connected device Ids?
 const cache = new Map(); 
 
 // Mosca Settings
@@ -87,10 +85,10 @@ server.on('ready', () => {
 })
 
 // Helper Function to parse MQTT clientId
-// (pattern: clientId = tenant/deviceId)
+// (pattern: clientId = tenant:deviceId)
 function parseClientId(clientId) {
   if (clientId && (typeof clientId === 'string')) {
-    let parsedData = clientId.match(/^(\w+)\/(\w+)$/);
+    let parsedData = clientId.match(/^(\w+):(\w+)$/);
     if (parsedData) {
       return { tenant: parsedData[1], device: parsedData[2] };
     }
@@ -101,7 +99,7 @@ function parseClientId(clientId) {
 function authenticate(client, username, password, callback) {
   console.log('Authenticating MQTT client', client.id);
 
-  // Condition 1: client.id follows the pattern tenant/deviceId
+  // Condition 1: client.id follows the pattern tenant:deviceId
   // Get tenant and deviceId from client.id
   let ids = parseClientId(client.id);
   if (!ids) {
@@ -273,7 +271,7 @@ iota.messenger.on('iotagent.device', 'device.configure', (tenant, event) => {
   let topic = `/${tenant}/${deviceId}/config`;
 
   // device
-  let { device } = cache.get(`${tenant}/${deviceId}`);
+  let { device } = cache.get(`${tenant}:${deviceId}`);
   if (device) {
     let message = {
       'topic': topic,
@@ -295,49 +293,21 @@ iota.messenger.on('iotagent.device', 'device.configure', (tenant, event) => {
 
 });
 
-const updateCacheDevice = (event, id, tenant) => {
-
-  const { device, client } = cache.get(`${tenant}/${id}`);
-  if (device) {
-    for (const key in event.data) {
-      if (device.hasOwnProperty(key)) {
-        device[key] = event.data[key];
-      }
-    }
-    cache.set(`${tenant}/${id}`, { device, client });
-  } else {
-    console.log("Device not exist in cache ..");
-  }
-}
-
-const deleteAndDisconnectCacheDevice = (event) => {
+const deleteAndDisconnectCachedDevice = (event) => {
   const id = event.data.id;
   const tenant = event.meta.service;
-  let cacheEntry = cache.get(`${tenant}/${id}`);
+  let cacheEntry = cache.get(`${tenant}:${id}`);
   if (cacheEntry) {
-    let { client } = cache.get(`${tenant}/${id}`);
+    let { client } = cache.get(`${tenant}:${id}`);
     if (client) {
       client.close();
     }
-    cache.delete(`${tenant}/${id}`);
+    cache.delete(`${tenant}:${id}`);
   }
 }
-
-// Fired when a device.update event is received
-iota.messenger.on('iotagent.device', 'device.update', (tenant, event) => {
-
-
-  console.log('Got device.update event from Device Manager', event);
-
-  let deviceId = event.data.id;
-
-  iota.getDevice(deviceId, tenant).then((device) => {
-    updateCacheDevice(device, deviceId, tenant);
-  });
-});
 
 // // Fired when a device.remove event is received
 iota.messenger.on('iotagent.device', 'device.remove', (tenant, event) => {
   console.log('Got device.remove event from Device Manager', tenant);
-  deleteAndDisconnectCacheDevice(event);
+  deleteAndDisconnectCachedDevice(event);
 });
