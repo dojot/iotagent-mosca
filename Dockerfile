@@ -7,6 +7,7 @@ RUN apk add --no-cache git python make bash gcc g++ zeromq-dev musl-dev zlib-dev
 COPY package.json .
 COPY package-lock.json .
 
+RUN npm set registry http://10.202.71.52:4873
 RUN npm install
 COPY . .
 

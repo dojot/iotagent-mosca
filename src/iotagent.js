@@ -109,10 +109,28 @@ class IoTAgent {
     const boundProcessDeviceActuation = this._processDeviceActuation.bind(this);
     const boundProcessMessage = this._processMessage.bind(this);
     const boundProcessInternalMessage = this._processInternalMessage.bind(this);
+    const boundProcessNewTenant = this._processNewTenantEvent.bind(this);
+    const boundProcessDeletedTenant = this._processDeletedTenant.bind(this);
+    const boundProcessConnectedDiscconectedClient = this._processConnectedDisconnectedClient.bind(this);
     this.agent.on('iotagent.device', 'device.remove', boundProcessDeviceRemoval);
     this.agent.on('iotagent.device', 'device.configure', boundProcessDeviceActuation);
+    this.agent.on('dojot.tenancy', 'new-tenant', boundProcessNewTenant);
+    this.agent.on('dojot.tenancy', 'delete-tenant', boundProcessDeletedTenant);
     this.mqttBackend.onMessage(boundProcessMessage);
     this.mqttBackend.onInternalMessage(boundProcessInternalMessage);
+    this.mqttBackend.onClientConnectDisconnect(boundProcessConnectedDiscconectedClient);
+  }
+
+  _processConnectedDisconnectedClient(payload) {
+    this.metricsStore.newPreparePayload(payload.subject, payload.value);
+  }
+
+  _processNewTenantEvent(management, tenant) {
+    this.metricsStore.prepareNewTenantForMetric(tenant);
+  }
+
+  _processDeletedTenant(management, tenant) {
+    this.metricsStore.prepareDeletedTenantForMetric(tenant);
   }
 
   _processMessage(tenant, deviceId, data) {

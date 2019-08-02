@@ -100,6 +100,10 @@ class MqttBackend {
     this.agentCallbackInternal = callback;
   }
 
+  onClientConnectDisconnect(callback) {
+    this.agentClientConnectDisconnect = callback;
+  }
+
   /**
    * Register all Mosca callbacks.
    *
@@ -121,17 +125,60 @@ class MqttBackend {
 
     const boundProcessMessage = this._processMessage.bind(this);
     this.server.on("published", boundProcessMessage);
+
+    const boundClientConnected = this._processClientConnected.bind(this);
     // Fired when a client connects to mosca server
-    this.server.on("clientConnected", (client) => {
-      logger.info(`Client connected: ${client.id}`, TAG);
-    });
+    this.server.on("clientConnected", boundClientConnected);
 
+    const boundClientDisconnected = this._processClientDisconnected.bind(this);
     // Fired when a client disconnects from mosca server
-    this.server.on("clientDisconnected", (client) => {
-      logger.info(`Client disconnected: ${client.id}`, TAG);
-      this.cache.delete(client.id);
-    });
+    this.server.on("clientDisconnected", boundClientDisconnected);
+  }
 
+  /**
+   * Callback to process when a new Client is connected
+   * @param {object} client client connected
+   */
+  _processClientConnected(client) {
+    logger.info(`Client connected: ${client.id}`, TAG);
+
+    if (!this.agentClientConnectDisconnect) {
+      logger.error(`There is no callback to invoke for client connect or disconnect event. This is an unrecoverable error.`, TAG);
+      logger.error(`Bailing out.`, TAG);
+      return
+    }
+
+    const tenant = client.id.split(":");
+    if (tenant.length >= 2) {
+      // 1 beacuse is 1 client
+      const metricMessage = { subject: tenant[0], connectedClients: 1 };
+      this.agentClientConnectDisconnect(metricMessage);
+    } else {
+      logger.warn(`Client id: ${client.id} dont follow the pattern tenant:deviceId. Metric will not be computed for this client`, TAG)
+    }
+  }
+
+  /**
+   * Callback to process when a Client disconnect
+   * @param {object} client  the disconneted client
+   */
+  _processClientDisconnected(client) {
+    logger.info(`Client disconnected: ${client.id}`, TAG);
+    this.cache.delete(client.id);
+    if (!this.agentClientConnectDisconnect) {
+      logger.error(`There is no callback to invoke for client connect or disconnect event. This is an unrecoverable error.`, TAG);
+      logger.error(`Bailing out.`, TAG);
+      return
+    }
+
+    const tenant = client.id.split(":");
+    if (tenant.length >= 2) {
+      // -1 beacuse is 1 client less
+      const metricMessage = { subject: tenant[0], connectedClients: -1 };
+      this.agentClientConnectDisconnect(metricMessage);
+    } else {
+      logger.warn(`Client id: ${client.id} dont follow the pattern tenant:deviceId. Metric was not computed for this client`, TAG)
+    }
   }
 
   /**
@@ -168,7 +215,7 @@ class MqttBackend {
    * @param {obj} client The connected client that sent this packet
    */
   _processMessage(packet, client) {
-    logger.debug(`Received a message via MQTT.`, TAG);
+    // logger.debug(`Received a message via MQTT.`, TAG);
     if (!this.agentCallback || !this.agentCallbackInternal) {
       logger.error(`There is no callback to invoke. This is an unrecoverable error.`, TAG);
       logger.error(`Bailing out.`, TAG);
