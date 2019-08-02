@@ -5,6 +5,9 @@
   "main": "index.js",
   "bin": "index.js",
   "scripts": {
+    "snyk-test": "snyk test",
+    "snyk-protect": "snyk protect",
+    "prepublish": "npm run snyk-protect",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/index.js"
   },
@@ -26,9 +29,17 @@
   "dependencies": {
     "@dojot/dojot-module-logger": "0.0.1-alpha.5",
     "@dojot/healthcheck": "^0.0.1-alpha",
-    "@dojot/iotagent-nodejs": "^2.1.0-beta",
+    "@dojot/iotagent-nodejs": "^2.1.0-beta.4",
+    "axios": "^0.19.0",
+    "bl": "^3.0.0",
     "express": "4.16.3",
-    "mosca": "^2.8.0",
+    "fstream": "^1.0.12",
+    "lodash": "^4.17.14",
+    "mosca": "^2.8.3",
     "redis": "^2.8.0"
+  },
+  "snyk": true,
+  "devDependencies": {
+    "snyk": "^1.205.0"
   }
 }

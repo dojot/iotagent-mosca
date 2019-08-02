@@ -1,0 +1,40 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.13.5
+# ignores vulnerabilities until expiry date; change duration by modifying expiry date
+ignore:
+  SNYK-JS-AXIOS-174505:
+    - '@dojot/iotagent-nodejs > axios':
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+  SNYK-JS-LODASH-450202:
+    - mosca > ioredis > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+    - mosca > ascoltatori > kafka-node > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+  SNYK-JS-LODASH-73638:
+    - mosca > ioredis > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+    - mosca > ascoltatori > kafka-node > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+  SNYK-JS-LODASH-73639:
+    - mosca > ioredis > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+    - mosca > ascoltatori > kafka-node > lodash:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+  'npm:bl:20160119':
+    - mosca > level-sublevel > levelup > bl:
+        reason: There was no patches and upgrades available
+        expires: '2019-08-14T12:41:05.175Z'
+# patches apply the minimum changes required to fix a vulnerability
+patch:
+  'npm:lodash:20180130':
+    - mosca > ascoltatori > kafka-node > lodash:
+        patched: '2019-07-15T13:52:03.139Z'
+    - mosca > ioredis > lodash:
+        patched: '2019-07-15T13:52:03.139Z'
