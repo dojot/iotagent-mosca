@@ -122,7 +122,7 @@ class IoTAgent {
   }
 
   _processConnectedDisconnectedClient(payload) {
-    this.metricsStore.newPreparePayload(payload.subject, payload.value);
+    this.metricsStore.newPreparePayload(payload);
   }
 
   _processNewTenantEvent(management, tenant) {

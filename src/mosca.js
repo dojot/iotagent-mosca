@@ -149,13 +149,8 @@ class MqttBackend {
     }
 
     const tenant = client.id.split(":");
-    if (tenant.length >= 2) {
-      // 1 beacuse is 1 client
-      const metricMessage = { subject: tenant[0], connectedClients: 1 };
-      this.agentClientConnectDisconnect(metricMessage);
-    } else {
-      logger.warn(`Client id: ${client.id} dont follow the pattern tenant:deviceId. Metric will not be computed for this client`, TAG)
-    }
+    const metricMessage = { subject: tenant[0], connectedClients: 1 };
+    this.agentClientConnectDisconnect(metricMessage);
   }
 
   /**
@@ -172,13 +167,8 @@ class MqttBackend {
     }
 
     const tenant = client.id.split(":");
-    if (tenant.length >= 2) {
-      // -1 beacuse is 1 client less
-      const metricMessage = { subject: tenant[0], connectedClients: -1 };
-      this.agentClientConnectDisconnect(metricMessage);
-    } else {
-      logger.warn(`Client id: ${client.id} dont follow the pattern tenant:deviceId. Metric was not computed for this client`, TAG)
-    }
+    const metricMessage = { subject: tenant[0], connectedClients: -1 };
+    this.agentClientConnectDisconnect(metricMessage);
   }
 
   /**
@@ -202,7 +192,7 @@ class MqttBackend {
    */
   _checkPayloadSize(data, size) {
     const len = data.length;
-    logger.debug(`Received a message with ${len} bytes`, TAG);
+    // logger.debug(`Received a message with ${len} bytes`, TAG);
     return (data.length <= size);
   }
 
