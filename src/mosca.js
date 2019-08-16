@@ -55,7 +55,7 @@ class MqttBackend {
       },
       interfaces: moscaInterfaces,
       logger: { name: "MoscaServer", level: logLevel },
-      stats: true
+      stats: false
     };
 
     this.cache = new Map();
