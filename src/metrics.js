@@ -3,6 +3,7 @@ const logger = require("@dojot/dojot-module-logger").logger;
 const Metric = require('./model/Metric');
 const TAG = { filename: "metrics"};
 const util = require('util');
+const getUser = require('./utils/auth').userDataByToken;
 
 /**
  * Metrics agent for IoT agent MQTT.
@@ -145,12 +146,20 @@ class Metrics {
 function getHTTPRouter(metricsStore) {
   const router = new express.Router();
   router.get('/iotagent-mqtt/metrics', (req, res) => {
+
     if (metricsStore.metrics) {
-      return res.status(200).json(metricsStore.metrics);
-    } else {
-      logger.debug(`Something unexpected happened`);
-      return res.status(500).json({ status: 'error', errors: [] });
+      const rawToken = req.get('authorization');
+      if (rawToken) {
+        const currentUser = getUser(rawToken);
+        let tenantIndex = metricsStore.metrics.findIndex((te) => te.tenant === currentUser.service);
+        if (tenantIndex == -1) {
+          tenantIndex = metricsStore.metrics.findIndex((te) => te.tenant === 'anonymous');
+        }
+        return res.status(200).json(metricsStore.metrics[tenantIndex]);
+      }
     }
+    logger.debug(`Something unexpected happened`);
+    return res.status(500).json({ status: 'error', errors: [] });
   });
   return router;
 }
