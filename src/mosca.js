@@ -255,7 +255,7 @@ class MqttBackend {
 
       if (payloadSizeChecked) {
         metricMessage.count = 1;
-        this.agentCallbackInternal(packet.topic, packet.payload);        
+        this.agentCallbackInternal(packet.topic, packet.payload);
       }
       else {
         logger.warn('Received Message too long from dojot', TAG);
