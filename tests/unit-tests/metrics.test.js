@@ -12,6 +12,7 @@
 const express = require("express");
 const stopApp = require("../../src/app").stopApp;
 const moscaMestrics = require("../../src/metrics");
+const MetricModel = require('../../src/model/Metric')
 
 const request = require("supertest");
 
@@ -37,45 +38,54 @@ describe("Testing metrics functions", () => {
     });
 
     it('Should return OK status and the metricStore object', async () => {
-        let metricStore = new moscaMestrics.Metrics();
-        metricStore.lastMetricsInfo = {
-            connectedClients: 0,
-            connectionsLoad1min: 0,
-            connectionsLoad5min: 0,
-            connectionsLoad15min: 0,
-            messagesLoad1min: 0,
-            messagesLoad5min: 0,
-            messagesLoad15min: 0
-        };
 
+        const metricsArray = [];
+        const metricsWithAnonymous = new MetricModel();
+        metricsWithAnonymous.tenant = 'anonymous';
+        metricsArray.push(metricsWithAnonymous);
+
+        let metricStore = new moscaMestrics.Metrics();
         app.use(moscaMestrics.getHTTPRouter(metricStore));
         let response = await get('/iotagent-mqtt/metrics', '');
 
-        expect(response.status).toEqual(200);
-        expect(JSON.parse(response.text)).toEqual({
-            "connectedClients": 0,
-            "connectionsLoad1min": 0,
-            "connectionsLoad5min": 0,
-            "connectionsLoad15min": 0,
-            "messagesLoad1min": 0,
-            "messagesLoad5min": 0,
-            "messagesLoad15min": 0
-        });
+        expect(response.status).toEqual(500);
+        // expect(JSON.parse(response.text)).toEqual(metricsArray);
     });
 
-    it("Should return NULL because function expects two strings as argument", () => {
+    it("Should not changes metrics because function expects an object as argument", () => {
+
+        const metricsArray = [];
+        const metricsWithAnonymous = new MetricModel();
+        metricsWithAnonymous.tenant = 'anonymous';
+        metricsArray.push(metricsWithAnonymous);
+
         const metrics = new moscaMestrics.Metrics();
         metrics.preparePayloadObject()
-        expect(metrics.lastMetricsInfo.connectedClients).toBeNull();
+        expect(metrics.metrics).toEqual(metricsArray);
 
         metrics.preparePayloadObject(0);
-        expect(metrics.lastMetricsInfo.connectedClients).toBeNull();
+        expect(metrics.metrics).toEqual(metricsArray);
+
+        metrics.preparePayloadObject({ subject: 'test-subject'});
+        expect(metrics.metrics).toEqual(metricsArray);
+
+        metrics.preparePayloadObject({ connectedClients: -1});
+        expect(metrics.metrics).toEqual(metricsArray);
     });
 
-    it("Should return NULL because function expects two strings as argument", () => {
+    it("Should modify the connectCLient Metric for anonymous tenant", () => {
+
         const metrics = new moscaMestrics.Metrics();
-        const metricsAttribute = "connectedClients";
-        metrics.preparePayloadObject(metricsAttribute, 20);
-        expect(metrics.lastMetricsInfo[`${metricsAttribute}`]).toEqual("20");
+        metrics.preparePayloadObject({ subject: 'anonymous', connectedClients: 1 });
+        expect(metrics.metrics[0].connectedClients).toEqual(1);
+
+        metrics.preparePayloadObject({ subject: 'inexistent-tenant', connectedClients: 1 });
+        expect(metrics.metrics[0].connectedClients).toEqual(2);
+    });
+
+    it("Should not prepare new Metric object for Tenant because of method expect a string parameter", () => {
+        const metrics = new moscaMestrics.Metrics();
+        metrics.prepareNewTenantForMetric();
+        // should fail
     });
 });

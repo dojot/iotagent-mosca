@@ -93,16 +93,19 @@ class Metrics {
   }
 
   prepareNewTenantForMetric(tenant) {
-    const metric = new Metric(tenant);
-    this.metrics.push(metric);
 
-    // the callbcak is been fired here
-    const callback = this._computeMetricsCallback(tenant);
-    this.metricsCallbacks[tenant] = {}
-    this.metricsCallbacks[tenant].count = 0;
-    this.metricsCallbacks[tenant].maxClientConnected = 0;
-    this.metricsCallbacks[tenant].callback = setInterval(callback, 60000);
-    this.logger.info(`Registered callback for -${tenant}- tenant to compute metrics`, TAG);
+    if(tenant) {
+      const metric = new Metric(tenant);
+      this.metrics.push(metric);
+
+      // the callbcak is been fired here
+      const callback = this._computeMetricsCallback(tenant);
+      this.metricsCallbacks[tenant] = {}
+      this.metricsCallbacks[tenant].count = 0;
+      this.metricsCallbacks[tenant].maxClientConnected = 0;
+      this.metricsCallbacks[tenant].callback = setInterval(callback, 60000);
+      this.logger.info(`Registered callback for -${tenant}- tenant to compute metrics`, TAG);
+    }
   }
 
   prepareValidInvalidMessageMetric(payload) {
@@ -132,15 +135,22 @@ class Metrics {
   }
 
   preparePayloadObject(payload) {
-    const tenant = payload.subject;
-    const dataKey = Object.keys(payload)[1];
 
-    logger.info(`Preparing payload object ${util.inspect(payload)}`, TAG);
-    let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
-    if (tenantIndex == -1) {
-      tenantIndex = this.metrics.findIndex((te) => te.tenant === 'anonymous');
+    try {
+      const dataKey = Object.keys(payload)[1];
+      const tenant = payload.subject;
+
+      if(tenant && dataKey) {
+        logger.info(`Preparing payload object ${util.inspect(payload)}`, TAG);
+        let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
+        if (tenantIndex == -1) {
+          tenantIndex = this.metrics.findIndex((te) => te.tenant === 'anonymous');
+        }
+        this.metrics[tenantIndex][dataKey] += payload[dataKey];
+      }
+    } catch (error) {
+      logger.error(`Error ${error} preparing payload Object`, TAG);
     }
-    this.metrics[tenantIndex][dataKey] += payload[dataKey];
   }
 }
 function getHTTPRouter(metricsStore) {

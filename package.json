@@ -5,7 +5,7 @@
   "main": "index.js",
   "bin": "index.js",
   "scripts": {
-    "test": "jest tests/unit-tests/*.test.js --coverage",
+    "test": "jest tests/unit-tests/metrics.test.js --coverage",
     "start": "node src/index.js",
     "docs": "jsdoc -R ./README.md -p ./package.json -r -d ./docs --access all ./lib -c ./jsdoc.conf"
   },
@@ -27,7 +27,7 @@
   "dependencies": {
     "@dojot/dojot-module-logger": "0.0.1-alpha.5",
     "@dojot/healthcheck": "^0.0.1-alpha",
-    "@dojot/iotagent-nodejs": "^2.1.0-beta.5",
+    "@dojot/iotagent-nodejs": "^2.1.0-beta.6",
     "express": "4.16.3",
     "mosca": "^2.8.0",
     "redis": "^2.8.0"
