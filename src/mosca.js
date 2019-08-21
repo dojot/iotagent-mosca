@@ -40,6 +40,8 @@ class MqttBackend {
       moscaInterfaces.push(mqtt);
     }
 
+    // stats publish every 10 seconds payloads received on SYS topic
+    // case stats is true, dont, forget to implement a callback for onInternalMessage
     var moscaSettings = {
       backend: {
         type: "redis",
@@ -67,6 +69,7 @@ class MqttBackend {
     this.server.on("ready", boundSetMoscaCallbacks);
     this.agentCallback = undefined;
     this.agentCallbackInternal = undefined;
+    this.agentInvalidMessageStatusCallback = undefined;
   }
 
   /**
@@ -83,6 +86,20 @@ class MqttBackend {
    */
   onMessage(callback) {
     this.agentCallback = callback;
+  }
+
+  /**
+   * Set a callback to be invoked when a message is received
+   * to identify if is a valid, its an Metric Helper
+   *
+   * * It should have 1 parameter:
+   *
+   * - {obj} payload: The JSON object describing if is a valid or invalid message.
+   *
+   * @param {*} callback The callback to be invoked whenever an invalid message is received
+   */
+  onValidInvalidMessage(callback) {
+    this.agentInvalidMessageStatusCallback = callback
   }
 
   /**
@@ -115,10 +132,12 @@ class MqttBackend {
     // callbacks
     this.server.authenticate = this.authenticate.bind(this);
 
+
     // Always check whether device is doing the right thing.
     this.server.authorizePublish = (client, topic, payload, callback) => {
       this._checkAuthorization(client, topic, "attrs", callback);
     };
+
     this.server.authorizeSubscribe = (client, topic, callback) => {
       this._checkAuthorization(client, topic, "config", callback);
     };
@@ -192,7 +211,7 @@ class MqttBackend {
    */
   _checkPayloadSize(data, size) {
     const len = data.length;
-    // logger.debug(`Received a message with ${len} bytes`, TAG);
+    logger.debug(`Received a message with ${len} bytes`, TAG);
     return (data.length <= size);
   }
 
@@ -205,10 +224,25 @@ class MqttBackend {
    * @param {obj} client The connected client that sent this packet
    */
   _processMessage(packet, client) {
-    // logger.debug(`Received a message via MQTT.`, TAG);
+
+    // 1 mean a valid message and -1 invalid
+    let metricMessage = { subject: 'anonymous', count: -1 };
+
+    if (client) {
+      const generalInfos = this.parseClientIdOrTopic(client.id, packet.topic);
+      if (generalInfos) {
+        metricMessage.subject = generalInfos.tenant;
+      }
+    }
+
+    logger.debug(`Received a message via MQTT. on Published`, TAG);
     if (!this.agentCallback || !this.agentCallbackInternal) {
       logger.error(`There is no callback to invoke. This is an unrecoverable error.`, TAG);
       logger.error(`Bailing out.`, TAG);
+      if (this.agentInvalidMessageStatusCallback) {
+        // count invalid message
+        this.agentInvalidMessageStatusCallback(metricMessage);
+      }
       return;
     }
 
@@ -220,15 +254,23 @@ class MqttBackend {
       const payloadSizeChecked = this._checkPayloadSize(payloadAsString, defaultConfig.DojotToDevicePayloadSize);
 
       if (payloadSizeChecked) {
-        this.agentCallbackInternal(packet.topic, packet.payload);
+        metricMessage.count = 1;
+        this.agentCallbackInternal(packet.topic, packet.payload);        
       }
       else {
         logger.warn('Received Message too long from dojot', TAG);
       }
 
+      if(this.agentInvalidMessageStatusCallback) {
+        this.agentInvalidMessageStatusCallback(metricMessage);
+      }
       return;
     } else if ((client === undefined) || (client === null)) {
       logger.debug(`No MQTT client was created. Bailing out.`, TAG);
+      if(this.agentInvalidMessageStatusCallback) {
+        metricMessage.subject = 'anonymous';
+        this.agentInvalidMessageStatusCallback(metricMessage);
+      }
       return;
     }
 
@@ -236,6 +278,7 @@ class MqttBackend {
 
     if (!payloadSizeChecked) {
       logger.warn('Received Message too long', TAG);
+      this.agentInvalidMessageStatusCallback(metricMessage);
       return;
     }
 
@@ -247,6 +290,7 @@ class MqttBackend {
       logger.debug(`... failed.`, TAG);
       logger.warn(`Received message is not JSON: ${packet.payload.toString()}`, TAG);
       logger.warn(`Ignoring it.`, TAG);
+      this.agentInvalidMessageStatusCallback(metricMessage);
       return;
     }
     logger.debug(`... payload was successfully parsed.`, TAG);
@@ -256,7 +300,12 @@ class MqttBackend {
     logger.debug(`Data: ${util.inspect(data)}`, TAG);
 
     //send data to dojot broker
-    let ids = this.parseClientIdOrTopic(client.id, packet.topic);
+    const ids = this.parseClientIdOrTopic(client.id, packet.topic);
+    metricMessage.subject = ids.tenant;
+    metricMessage.count = 1;
+    if (this.agentInvalidMessageStatusCallback) {
+      this.agentInvalidMessageStatusCallback(metricMessage);
+    }
     this.agentCallback(ids.tenant, ids.device, data);
   }
 

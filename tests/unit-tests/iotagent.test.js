@@ -16,7 +16,6 @@ const IoTAgent = require("../../src/iotagent").IoTAgent;
 const defaultConfig = require("../../src/config");
 const HealthChecker = require("../../src/healthcheck").AgentHealthChecker;
 const Metrics = require("../../src/metrics").Metrics;
-const moscaSetup = require("../moscaSetup");
 
 //
 // Mocking dependencies
