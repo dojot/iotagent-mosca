@@ -290,7 +290,9 @@ class MqttBackend {
       logger.debug(`... failed.`, TAG);
       logger.warn(`Received message is not JSON: ${packet.payload.toString()}`, TAG);
       logger.warn(`Ignoring it.`, TAG);
-      this.agentInvalidMessageStatusCallback(metricMessage);
+      if(this.agentInvalidMessageStatusCallback) {
+        this.agentInvalidMessageStatusCallback(metricMessage);
+      }
       return;
     }
     logger.debug(`... payload was successfully parsed.`, TAG);

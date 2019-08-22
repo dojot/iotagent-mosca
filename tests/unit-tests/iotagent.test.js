@@ -135,6 +135,17 @@ describe("Mosca backend", () => {
         expect(mqttBackend.agentCallbackInternal).toEqual("sample-callback");
     });
 
+    it("Should be able to register a callback processing metrics valid and invalid message count", () => {
+        const mqttBackend = new backend.MqttBackend("sample-agent");
+        mqttBackend.onValidInvalidMessage("sample-callback");
+        expect(mqttBackend.agentInvalidMessageStatusCallback).toEqual("sample-callback");
+    });
+
+    it("Should be able to register a callback processing metrics for connected and disconnected clients", () => {
+        const mqttBackend = new backend.MqttBackend("sample-agent");
+        mqttBackend.onClientConnectDisconnect("sample-callback");
+        expect(mqttBackend.agentClientConnectDisconnect).toEqual("sample-callback");
+    });
 
     it("Should parse topic properly", () => {
         //As _processMessages is one entrypoint for data, it will be
@@ -155,7 +166,8 @@ describe("Mosca backend", () => {
     });
 
     it("Should process internal messages properly", () => {
-        //As _processMessages is one entrypoint for data, it will be
+        // stats is disable it just print received message
+        // As _processMessages is one entrypoint for data, it will be
         //tested (even if it is a internal function)
         const iotagent = new IoTAgent();
         iotagent.agent = new Agent();
@@ -167,44 +179,9 @@ describe("Mosca backend", () => {
             payload: { toString: () => "100" }
         }
 
+        const getTopicParameterSpy = jest.spyOn(iotagent, 'getTopicParameter');
         iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.connectedClients).toEqual('100');
-
-        samplePacket.topic = '$SYS/topic/load/connections/1min';
-        samplePacket.payload = '1';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.connectionsLoad1min).toEqual('1');
-
-        samplePacket.topic = '$SYS/topic/load/connections/5min';
-        samplePacket.payload = '5';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.connectionsLoad5min).toEqual('5');
-
-        samplePacket.topic = '$SYS/topic/load/connections/15min';
-        samplePacket.payload = '15';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.connectionsLoad15min).toEqual('15');
-
-        samplePacket.topic = '$SYS/topic/load/publish/.../1min';
-        samplePacket.payload = '1';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.messagesLoad1min).toEqual('1');
-
-        samplePacket.topic = '$SYS/topic/load/publish/.../5min';
-        samplePacket.payload = '5';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.messagesLoad5min).toEqual('5');
-
-        samplePacket.topic = '$SYS/topic/load/publish/.../15min';
-        samplePacket.payload = '15';
-
-        iotagent._processInternalMessage(samplePacket.topic, samplePacket.payload);
-        expect(iotagent.metricsStore.lastMetricsInfo.messagesLoad15min).toEqual('15');
+        expect(getTopicParameterSpy).toHaveBeenCalledWith(samplePacket.topic, 2);
     });
 
     it("Should process internal messages properly", () => {
@@ -277,5 +254,38 @@ describe("Mosca backend", () => {
         // >> Result verification
         expect(firstArgument).toEqual(message);
         // << Result verification
+    });
+
+    it("it should call the connected and disconnected callback", () => {
+        const iotagent = new IoTAgent();
+        iotagent.metricsStore = new Metrics();
+        const preparePayloadSpy = jest.spyOn(iotagent.metricsStore, 'preparePayloadObject');
+        iotagent._processConnectedDisconnectedClient('sample-test');
+        expect(preparePayloadSpy).toHaveBeenCalledWith('sample-test');
     })
+
+    it("it should call the deleted tenant callback", () => {
+        const iotagent = new IoTAgent();
+        iotagent.metricsStore = new Metrics();
+        const prepareDeletedTenantForMetricSpy = jest.spyOn(iotagent.metricsStore, 'prepareDeletedTenantForMetric');
+        iotagent._processDeletedTenant('sample-management', 'sample-tenant');
+        expect(prepareDeletedTenantForMetricSpy).toHaveBeenCalledWith('sample-tenant');
+    })
+
+    it("it should call the create tenant callback", () => {
+        const iotagent = new IoTAgent();
+        iotagent.metricsStore = new Metrics();
+        const prepareNewTenantForMetricSpy = jest.spyOn(iotagent.metricsStore, 'prepareNewTenantForMetric');
+        iotagent._processNewTenantEvent('sample-management', 'sample-tenant');
+        expect(prepareNewTenantForMetricSpy).toHaveBeenCalledWith('sample-tenant');
+    })
+
+    it("it should call the validInvalid message tenant callback", () => {
+        const iotagent = new IoTAgent();
+        iotagent.metricsStore = new Metrics();
+        const prepareValidInvalidMessageMetricSpy = jest.spyOn(iotagent.metricsStore, 'prepareValidInvalidMessageMetric');
+        iotagent._processValidInvalidMessage('sample-test');
+        expect(prepareValidInvalidMessageMetricSpy).toHaveBeenCalledWith('sample-test');
+    })
+
 });

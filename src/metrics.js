@@ -72,7 +72,7 @@ class Metrics {
       if ((timerExpiredCount % 60) === 0) {
         this.metrics[tenantIndex].connectionsLoad1hour = maxClientConnected / (timerExpiredCount / 60);
         this.metrics[tenantIndex].validMessages.count1hour = validMessagesCount / (timerExpiredCount / 60);
-        this.metrics[tenantIndex].invalidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 60);
+        this.metrics[tenantIndex].inValidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 60);
         logger.debug(`Computed metrics for connectedClient 1h/60min on tenant ${tenant}`, TAG);
       }
 
@@ -80,21 +80,22 @@ class Metrics {
       if ((timerExpiredCount % 1440) === 0) {
         this.metrics[tenantIndex].connectionsLoad1day = maxClientConnected / (timerExpiredCount / 1440);
         this.metrics[tenantIndex].validMessages.count1hour = validMessagesCount / (timerExpiredCount / 1440);
-        this.metrics[tenantIndex].invalidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 1440);
+        this.metrics[tenantIndex].inValidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 1440);
         logger.debug(`Computed metrics for connectedClient 1day/1440min on tenant ${tenant}`, TAG);
       }
-
-      this.connectionsLoad5min = 0;
-      this.connectionsLoad15min = 0;
-      this.connectionsLoad1hour = 0;
-      this.connectionsLoad1day = 0;
-
     };
   }
 
   prepareNewTenantForMetric(tenant) {
 
     if(tenant) {
+
+      const tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
+
+      if (tenantIndex !== -1) {
+        logger.warn(`Tenant ${tenant} already have metric computed -Ignoring`, TAG);
+        return;
+      }
       const metric = new Metric(tenant);
       this.metrics.push(metric);
 
@@ -109,23 +110,41 @@ class Metrics {
   }
 
   prepareValidInvalidMessageMetric(payload) {
+
     logger.info(`Preparing payload object ${util.inspect(payload)}`, TAG);
 
-    const tenant = payload.subject;
-    let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
-    if (tenantIndex == -1) {
-      tenantIndex = this.metrics.findIndex((te) => te.tenant === 'anonymous');
-    }
+    try {
+      const tenant = payload.subject;
+      let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
+      if (tenantIndex == -1) {
+        tenantIndex = this.metrics.findIndex((te) => te.tenant === 'anonymous');
+      }
 
-    if(payload.count == 1) {
-      this.metrics[tenantIndex].validMessages.count += 1;
-      return;
+      if(payload.count == 1) {
+        this.metrics[tenantIndex].validMessages.count += 1;
+        return;
+      }
+      this.metrics[tenantIndex].inValidMessages.count += 1;
+    } catch (error) {
+      logger.warn(`Error ${error} - preparing valid or invalid, payload metric`, TAG);
     }
-    this.metrics[tenantIndex].inValidMessages.count += 1;
   }
 
   prepareDeletedTenantForMetric(tenant) {
+
+    if(!tenant) {
+      logger.warn(`Expected a tenant as argument - received ${tenant}`, TAG);
+      return;
+    }
+
     const tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
+
+    if (tenantIndex === -1) {
+      logger.warn(`Tenant doesn't exist, nothing to delete`, TAG);
+      return;
+    }
+
+    // remove the tenant
     this.metrics.splice(tenantIndex, 1);
 
     // stop the timeOut and run it again and delete the object
@@ -149,7 +168,7 @@ class Metrics {
         this.metrics[tenantIndex][dataKey] += payload[dataKey];
       }
     } catch (error) {
-      logger.error(`Error ${error} preparing payload Object`, TAG);
+      logger.warn(`Error ${error} preparing payload Object`, TAG);
     }
   }
 }
@@ -167,6 +186,7 @@ function getHTTPRouter(metricsStore) {
         }
         return res.status(200).json(metricsStore.metrics[tenantIndex]);
       }
+      return res.status(401).json({ status: 'error', errors: ['Unauthorized'] });
     }
     logger.debug(`Something unexpected happened`);
     return res.status(500).json({ status: 'error', errors: [] });

@@ -95,6 +95,7 @@ describe("Testing Mosca functions", () => {
         packet.topic = '$SYS/admin/6dc341/attrs';
         packet.payload = {'message': 'ashfhasdjfkasdfaksfdasfasdfasdhfasdfasdhfhasdfhasdfasdfhkasdhflasdfhasdhfasdjfiopasdfjnasfgasdfjasdfoasdfhasdlflasdfjlasdlçfjklçasdfoasfgakljkl'};
 
+        mosca.agentInvalidMessageStatusCallback = jest.fn();
         mosca.agentCallbackInternal = jest.fn();
         expect(mosca._processMessage(packet, null)).toBeUndefined();
     });
