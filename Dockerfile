@@ -7,7 +7,7 @@ RUN apk add --no-cache git python make bash gcc g++ zeromq-dev musl-dev zlib-dev
 COPY package.json .
 COPY package-lock.json .
 
-RUN npm install 
+RUN npm install
 COPY . .
 
 FROM node:8.14.0-alpine

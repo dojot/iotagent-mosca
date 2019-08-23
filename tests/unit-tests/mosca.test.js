@@ -184,4 +184,14 @@ describe("Testing Mosca functions", () => {
         expect(client.close).not.toHaveBeenCalled();
         expect(cacheEntry.deviceId).toBeUndefined();
     });
+
+    test("should check authorization for a given client", () => {
+
+        const callback = jest.fn()
+        const newMosca = new Mosca.MqttBackend(agent);
+        const cacheEntry = { deviceId: 'u86fda'};
+        newMosca.cache.set('admin:u86fda', cacheEntry);
+        newMosca._checkAuthorization({ id: 'admin:u86fda'}, '/admin/u86fda/attrs', 'attrs', callback);
+        expect(callback).toHaveBeenCalledWith(null, true);
+    })
 });
