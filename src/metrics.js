@@ -25,10 +25,17 @@ class Metrics {
   _registerLoad(tenant) {
 
     const date = Date.now();
-    const k = 60 * 1000;
+    const k = 60 * 1000; // constant
 
     const callback = this._computeMetricsCallback(tenant);
     this.metricsCallbacks[tenant] = {}
+
+    /**
+     * The metrics are computed using moving average.
+     * This timer register a callback to be called each 10 seconds
+     * Then sample and compute the metrics based on the
+     * connected client, valid and invalid messages since the last timeout.
+     */
     this.metricsCallbacks[tenant].callback = setInterval(callback, 10000);
 
     this.metricsCallbacks[tenant].lastIntervalConnectedClients = 0;

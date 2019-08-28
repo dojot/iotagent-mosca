@@ -194,14 +194,15 @@ describe("Testing metrics functions", () => {
         const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad1min, 'movingAverage');
         
         // anonymouns index is 0, is the fisrt tenant registered
+        let connecteClients = 0;
         jest.runOnlyPendingTimers();
 
-        // no clilent connected
+        // no client connected
         expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1 clilent connected
-        metrics.metrics[0].connectedClients = 1;
-        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
+        connecteClients = 1545415454;
+        metrics.metrics[0].connectedClients = connecteClients;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = connecteClients;
         jest.runOnlyPendingTimers();
         expect(moveAverageSpy).toBeCalledTimes(2);
     });
@@ -211,14 +212,16 @@ describe("Testing metrics functions", () => {
         const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad5min, 'movingAverage');
         
         // anonymouns index is 0, is the fisrt tenant registered
+        let connecteClients = 0;
         jest.runOnlyPendingTimers();
 
-        // no clilent connected
+        // no client connected
         expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1 clilent connected
-        metrics.metrics[0].connectedClients = 1;
-        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
+        // 1 client connected
+        connecteClients = 1542555;
+        metrics.metrics[0].connectedClients = connecteClients;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = connecteClients;
         jest.runOnlyPendingTimers();
         expect(moveAverageSpy).toBeCalledTimes(2);
     });
@@ -228,14 +231,16 @@ describe("Testing metrics functions", () => {
         const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad15min, 'movingAverage');
         
         // anonymouns index is 0, is the fisrt tenant registered
+        let connecteClients = 0;
         jest.runOnlyPendingTimers();
 
-        // no clilent connected
+        // no client connected
         expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1 clilent connected
-        metrics.metrics[0].connectedClients = 1;
-        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
+        // 1 client connected
+        connecteClients = 15;
+        metrics.metrics[0].connectedClients = connecteClients;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = connecteClients;
         jest.runOnlyPendingTimers();
         expect(moveAverageSpy).toBeCalledTimes(2);
     });
@@ -245,14 +250,15 @@ describe("Testing metrics functions", () => {
         const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad1hour, 'movingAverage');
         
         // anonymouns index is 0, is the fisrt tenant registered
+        let connecteClients = 0;
         jest.runOnlyPendingTimers();
 
-        // no clilent connected
+        // no client connected
         expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1 clilent connected
-        metrics.metrics[0].connectedClients = 1;
-        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
+        connecteClients = 1254;
+        metrics.metrics[0].connectedClients = connecteClients;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = connecteClients;
         jest.runOnlyPendingTimers();
         expect(moveAverageSpy).toBeCalledTimes(2);
     });
