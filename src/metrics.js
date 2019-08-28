@@ -1,9 +1,10 @@
 const express = require("express");
 const logger = require("@dojot/dojot-module-logger").logger;
 const Metric = require('./model/Metric');
-const TAG = { filename: "metrics"};
 const util = require('util');
+const movingAverage = require('moving-average');
 const getUser = require('./utils/auth').userDataByToken;
+const TAG = { filename: "metrics" };
 
 /**
  * Metrics agent for IoT agent MQTT.
@@ -18,12 +19,63 @@ class Metrics {
     const anonymousStr = 'anonymous';
     const anonymousMetric = new Metric(anonymousStr);
     this.metrics.push(anonymousMetric);
+    this._registerLoad(anonymousStr);
+  }
 
-    const callback = this._computeMetricsCallback(anonymousStr);
-    this.metricsCallbacks[anonymousStr] = {}
-    this.metricsCallbacks[anonymousStr].count = 0;
-    this.metricsCallbacks[anonymousStr].maxClientConnected = 0;
-    this.metricsCallbacks[anonymousStr].callback = setInterval(callback, 60000);
+  _registerLoad(tenant) {
+
+    const date = Date.now();
+    const k = 60 * 1000;
+
+    const callback = this._computeMetricsCallback(tenant);
+    this.metricsCallbacks[tenant] = {}
+    this.metricsCallbacks[tenant].callback = setInterval(callback, 10000);
+
+    this.metricsCallbacks[tenant].lastIntervalConnectedClients = 0;
+    this.metricsCallbacks[tenant].lastIntervalValidMessageCount = 0;
+    this.metricsCallbacks[tenant].lastIntervalInValidMessageCount = 0;
+
+    // 1min
+    this.metricsCallbacks[tenant].connectionsLoad1min = movingAverage(1 * Number(k));
+    this.metricsCallbacks[tenant].connectionsLoad1min.push(date, 0);
+
+    this.metricsCallbacks[tenant].validMessagesLoad1min = movingAverage(1 * Number(k))
+    this.metricsCallbacks[tenant].validMessagesLoad1min.push(date, 0);
+
+    this.metricsCallbacks[tenant].inValidMessagesLoad1min = movingAverage(1 * Number(k))
+    this.metricsCallbacks[tenant].inValidMessagesLoad1min.push(date, 0);
+
+    // 5min
+    this.metricsCallbacks[tenant].connectionsLoad5min = movingAverage(5 * Number(k));
+    this.metricsCallbacks[tenant].connectionsLoad5min.push(date, 0);
+
+    this.metricsCallbacks[tenant].validMessagesLoad5min = movingAverage(5 * Number(k));
+    this.metricsCallbacks[tenant].validMessagesLoad5min.push(date, 0);
+
+    this.metricsCallbacks[tenant].inValidMessagesLoad5min = movingAverage(5 * Number(k));
+    this.metricsCallbacks[tenant].inValidMessagesLoad5min.push(date, 0);
+
+    // 15min
+    this.metricsCallbacks[tenant].connectionsLoad15min = movingAverage(15 * Number(k));
+    this.metricsCallbacks[tenant].connectionsLoad15min.push(date, 0);
+
+    this.metricsCallbacks[tenant].validMessagesLoad15min = movingAverage(15 * Number(k));
+    this.metricsCallbacks[tenant].validMessagesLoad15min.push(date, 0);
+
+    this.metricsCallbacks[tenant].inValidMessagesLoad15min = movingAverage(15 * Number(k));
+    this.metricsCallbacks[tenant].inValidMessagesLoad15min.push(date, 0);
+
+    // 1hour
+    this.metricsCallbacks[tenant].connectionsLoad1hour = movingAverage(60 * Number(k));
+    this.metricsCallbacks[tenant].connectionsLoad1hour.push(date, 0);
+
+    this.metricsCallbacks[tenant].validMessagesLoad1hour = movingAverage(60 * Number(k));
+    this.metricsCallbacks[tenant].validMessagesLoad1hour.push(date, 0);
+
+    this.metricsCallbacks[tenant].inValidMessagesLoad1hour = movingAverage(60 * Number(k));
+    this.metricsCallbacks[tenant].inValidMessagesLoad1hour.push(date, 0);
+
+    this.logger.info(`Registered callback for -${tenant}- tenant to compute metrics`, TAG);
   }
 
   /**
@@ -33,56 +85,71 @@ class Metrics {
    */
   _computeMetricsCallback(tenant) {
     return () => {
-      // increase counter
-      this.metricsCallbacks[tenant].count += 1;
-      const timerExpiredCount = this.metricsCallbacks[tenant].count;
-      const tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
-      const connectedClients = this.metrics[tenantIndex].connectedClients;
 
-      // valid messages
-      const validMessagesCount = this.metrics[tenantIndex].validMessages.count;
-      // invalid messages
-      const invalidMessagesCount = this.metrics[tenantIndex].inValidMessages.count;
+      let value = 0;
+      let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
 
-      if (connectedClients > this.metricsCallbacks[tenant].maxClientConnected) {
-        this.metricsCallbacks[tenant].maxClientConnected = connectedClients;
-      }
+      const date = new Date();
+      const lastInterValConnected = this.metricsCallbacks[tenant].lastIntervalConnectedClients;
+      const lastInterValvalidMessages = this.metricsCallbacks[tenant].lastIntervalValidMessageCount;
+      const lastInterValInValidMessages = this.metricsCallbacks[tenant].lastIntervalInValidMessageCount;
 
-      const maxClientConnected = this.metricsCallbacks[tenant].maxClientConnected;
+      // 1min
+      this.metricsCallbacks[tenant].connectionsLoad1min.push(date, lastInterValConnected);
+      this.metricsCallbacks[tenant].validMessagesLoad1min.push(date, lastInterValvalidMessages);
+      this.metricsCallbacks[tenant].inValidMessagesLoad1min.push(date, lastInterValInValidMessages);
 
-      // computing Load for 1 minute
-      this.metrics[tenantIndex].connectionLoad1min = maxClientConnected / timerExpiredCount;
-      this.metrics[tenantIndex].validMessages.count1min = validMessagesCount / timerExpiredCount;
-      this.metrics[tenantIndex].inValidMessages.count1min = invalidMessagesCount / timerExpiredCount;
-      logger.debug(`Computed metrics for connectedClient and message message count 1min on tenant ${tenant}`, TAG);
+      // 5min
+      this.metricsCallbacks[tenant].connectionsLoad5min.push(date, lastInterValConnected);
+      this.metricsCallbacks[tenant].validMessagesLoad5min.push(date, lastInterValvalidMessages);
+      this.metricsCallbacks[tenant].inValidMessagesLoad5min.push(date, lastInterValInValidMessages);
 
-      // computing Load for 5 min (1*5)
-      if ((timerExpiredCount % 5) === 0) {
-        this.metrics[tenantIndex].connectionsLoad5min = maxClientConnected / (timerExpiredCount / 5);
-        logger.debug(`Computed metrics for connectedClient 5min on tenant ${tenant}`, TAG);
-      }
+      // 15min
+      this.metricsCallbacks[tenant].connectionsLoad15min.push(date, lastInterValConnected);
+      this.metricsCallbacks[tenant].validMessagesLoad15min.push(date, lastInterValvalidMessages);
+      this.metricsCallbacks[tenant].inValidMessagesLoad15min.push(date, lastInterValInValidMessages);
 
-      // computing Load for 15 min (1*15)
-      if ((timerExpiredCount % 15) === 0) {
-        this.metrics[tenantIndex].connectionsLoad15min = maxClientConnected / (timerExpiredCount / 15);
-        logger.debug(`Computed metrics for connectedClient 15min on tenant ${tenant}`, TAG);
-      }
+      // 1hour
+      this.metricsCallbacks[tenant].connectionsLoad1hour.push(date, lastInterValConnected);
+      this.metricsCallbacks[tenant].validMessagesLoad1hour.push(date, lastInterValvalidMessages);
+      this.metricsCallbacks[tenant].inValidMessagesLoad1hour.push(date, lastInterValInValidMessages);
 
-      // computing Load for 1 hour (1*60)
-      if ((timerExpiredCount % 60) === 0) {
-        this.metrics[tenantIndex].connectionsLoad1hour = maxClientConnected / (timerExpiredCount / 60);
-        this.metrics[tenantIndex].validMessages.count1hour = validMessagesCount / (timerExpiredCount / 60);
-        this.metrics[tenantIndex].inValidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 60);
-        logger.debug(`Computed metrics for connectedClient 1h/60min on tenant ${tenant}`, TAG);
-      }
+      // 1min
+      value = this.metricsCallbacks[tenant].connectionsLoad1min.movingAverage();
+      this.metrics[tenantIndex].connectionsLoad1min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].validMessagesLoad1min.movingAverage();
+      this.metrics[tenantIndex].validMessagesLoad1min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].inValidMessagesLoad1min.movingAverage();
+      this.metrics[tenantIndex].inValidMessagesLoad1min = Math.round(value * 100) / 100;
 
-      // computing Load for 1 day (1*24*60)
-      if ((timerExpiredCount % 1440) === 0) {
-        this.metrics[tenantIndex].connectionsLoad1day = maxClientConnected / (timerExpiredCount / 1440);
-        this.metrics[tenantIndex].validMessages.count1hour = validMessagesCount / (timerExpiredCount / 1440);
-        this.metrics[tenantIndex].inValidMessages.count1hour = invalidMessagesCount / (timerExpiredCount / 1440);
-        logger.debug(`Computed metrics for connectedClient 1day/1440min on tenant ${tenant}`, TAG);
-      }
+      // 5min
+      value = this.metricsCallbacks[tenant].connectionsLoad5min.movingAverage();
+      this.metrics[tenantIndex].connectionsLoad5min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].validMessagesLoad5min.movingAverage();
+      this.metrics[tenantIndex].validMessagesLoad5min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].inValidMessagesLoad5min.movingAverage();
+      this.metrics[tenantIndex].inValidMessagesLoad5min = Math.round(value * 100) / 100;
+
+      // 15min
+      value = this.metricsCallbacks[tenant].connectionsLoad15min.movingAverage();
+      this.metrics[tenantIndex].connectionsLoad15min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].validMessagesLoad15min.movingAverage();
+      this.metrics[tenantIndex].validMessagesLoad15min = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].inValidMessagesLoad15min.movingAverage();
+      this.metrics[tenantIndex].inValidMessagesLoad15min = Math.round(value * 100) / 100;
+
+      // 1hour
+      value = this.metricsCallbacks[tenant].connectionsLoad1hour.movingAverage();
+      this.metrics[tenantIndex].connectionsLoad1hour = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].validMessagesLoad1hour.movingAverage();
+      this.metrics[tenantIndex].validMessagesLoad1hour = Math.round(value * 100) / 100;
+      value = this.metricsCallbacks[tenant].inValidMessagesLoad1hour.movingAverage();
+      this.metrics[tenantIndex].inValidMessagesLoad1hour = Math.round(value * 100) / 100;
+
+      this.metricsCallbacks[tenant].lastIntervalConnectedClients = 0;
+      this.metricsCallbacks[tenant].lastIntervalValidMessageCount = 0;
+      this.metricsCallbacks[tenant].lastIntervalInValidMessageCount = 0;
+      logger.debug(`Computed Metrics for tenant: ${tenant}`, TAG);
     };
   }
 
@@ -98,14 +165,7 @@ class Metrics {
       }
       const metric = new Metric(tenant);
       this.metrics.push(metric);
-
-      // the callbcak is been fired here
-      const callback = this._computeMetricsCallback(tenant);
-      this.metricsCallbacks[tenant] = {}
-      this.metricsCallbacks[tenant].count = 0;
-      this.metricsCallbacks[tenant].maxClientConnected = 0;
-      this.metricsCallbacks[tenant].callback = setInterval(callback, 60000);
-      this.logger.info(`Registered callback for -${tenant}- tenant to compute metrics`, TAG);
+      this._registerLoad(tenant);
     }
   }
 
@@ -121,10 +181,12 @@ class Metrics {
       }
 
       if(payload.count == 1) {
-        this.metrics[tenantIndex].validMessages.count += 1;
+        this.metrics[tenantIndex].validMessages += 1;
+        this.metricsCallbacks[tenant].lastIntervalValidMessageCount += 1;
         return;
       }
-      this.metrics[tenantIndex].inValidMessages.count += 1;
+      this.metrics[tenantIndex].inValidMessages += 1;
+      this.metricsCallbacks[tenant].lastIntervalInValidMessageCount += 1;
     } catch (error) {
       logger.warn(`Error ${error} - preparing valid or invalid, payload metric`, TAG);
     }
@@ -157,15 +219,21 @@ class Metrics {
 
     try {
       const dataKey = Object.keys(payload)[1];
-      const tenant = payload.subject;
+      let tenant = payload.subject;
 
       if(tenant && dataKey) {
         logger.info(`Preparing payload object ${util.inspect(payload)}`, TAG);
         let tenantIndex = this.metrics.findIndex((te) => te.tenant === tenant);
         if (tenantIndex == -1) {
           tenantIndex = this.metrics.findIndex((te) => te.tenant === 'anonymous');
+          tenant = 'anonymous';
         }
         this.metrics[tenantIndex][dataKey] += payload[dataKey];
+        this.metricsCallbacks[tenant].lastIntervalConnectedClients += payload[dataKey];
+
+        if(dataKey === 'connectedClients') {
+          console.log('connectedClients');
+        }
       }
     } catch (error) {
       logger.warn(`Error ${error} preparing payload Object`, TAG);

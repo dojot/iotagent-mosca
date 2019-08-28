@@ -189,27 +189,27 @@ describe("Testing metrics functions", () => {
         });
     });
 
-    it("Should compute connectionLoad1min for anonymous registered tenants", () => {
+    it("Should compute connectionsLoad1min for anonymous registered tenants", () => {
         const metrics = new moscaMestrics.Metrics();
 
         // anonymouns index is 0, is the fisrt tenant registered
         jest.runOnlyPendingTimers();
 
         // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionLoad1min).toBe(0);
+        expect(metrics.metrics[0].connectionsLoad1min).toBe(0);
 
         // 1 clilent connected 2rst minute
         metrics.metrics[0].connectedClients = 1;
         jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionLoad1min).toBe(1 / 2);
+        expect(metrics.metrics[0].connectionsLoad1min).toBe(1 / 2);
 
         // 1890 clilent connected 3rd minute
         metrics.metrics[0].connectedClients = 1890;
         jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionLoad1min).toBe(1890 / 3);
+        expect(metrics.metrics[0].connectionsLoad1min).toBe(1890 / 3);
 
         // no changes for 5m 1h and 1day
-        expect(metrics.metrics[0].connectionLoad1min).toBe(1890 / 3);
+        expect(metrics.metrics[0].connectionsLoad1min).toBe(1890 / 3);
         expect(metrics.metrics[0].connectionsLoad5min).toBe(0);
         expect(metrics.metrics[0].connectionsLoad15min).toBe(0);
         expect(metrics.metrics[0].connectionsLoad1hour).toBe(0);
