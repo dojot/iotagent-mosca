@@ -136,8 +136,8 @@ describe("Testing metrics functions", () => {
         metrics.prepareValidInvalidMessageMetric();
 
         metrics.metrics.forEach(metric => {
-            expect(metric.validMessages.count).toEqual(0);
-            expect(metric.inValidMessages.count).toEqual(0);
+            expect(metric.validMessages).toEqual(0);
+            expect(metric.inValidMessages).toEqual(0);
         });
     });
 
@@ -148,11 +148,11 @@ describe("Testing metrics functions", () => {
         metrics.metrics.forEach(metric => {
 
             if (metric.tenant == 'anonymous') {
-                expect(metric.validMessages.count).toEqual(0);
-                expect(metric.inValidMessages.count).toEqual(1);
+                expect(metric.validMessages).toEqual(0);
+                expect(metric.inValidMessages).toEqual(1);
             } else {
-                expect(metric.validMessages.count).toEqual(0);
-                expect(metric.inValidMessages.count).toEqual(0)
+                expect(metric.validMessages).toEqual(0);
+                expect(metric.inValidMessages).toEqual(0)
             }
         });
     });
@@ -164,11 +164,11 @@ describe("Testing metrics functions", () => {
         metrics.metrics.forEach(metric => {
 
             if (metric.tenant == 'anonymous') {
-                expect(metric.validMessages.count).toEqual(0);
-                expect(metric.inValidMessages.count).toEqual(1);
+                expect(metric.validMessages).toEqual(0);
+                expect(metric.inValidMessages).toEqual(1);
             } else {
-                expect(metric.validMessages.count).toEqual(0);
-                expect(metric.inValidMessages.count).toEqual(0)
+                expect(metric.validMessages).toEqual(0);
+                expect(metric.inValidMessages).toEqual(0)
             }
         });
     });
@@ -180,141 +180,80 @@ describe("Testing metrics functions", () => {
         metrics.metrics.forEach(metric => {
 
             if (metric.tenant == 'anonymous') {
-                expect(metric.validMessages.count).toEqual(1);
-                expect(metric.inValidMessages.count).toEqual(0);
+                expect(metric.validMessages).toEqual(1);
+                expect(metric.inValidMessages).toEqual(0);
             } else {
-                expect(metric.validMessages.count).toEqual(0);
-                expect(metric.inValidMessages.count).toEqual(0)
+                expect(metric.validMessages).toEqual(0);
+                expect(metric.inValidMessages).toEqual(0)
             }
         });
     });
 
-    it("Should compute connectionsLoad1min for anonymous registered tenants", () => {
+    it("Should test compute connectionsLoad1min movingAverage function", () => {
         const metrics = new moscaMestrics.Metrics();
-
+        const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad1min, 'movingAverage');
+        
         // anonymouns index is 0, is the fisrt tenant registered
         jest.runOnlyPendingTimers();
 
-        // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionsLoad1min).toBe(0);
+        // no clilent connected
+        expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1 clilent connected 2rst minute
+        // 1 clilent connected
         metrics.metrics[0].connectedClients = 1;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
         jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionsLoad1min).toBe(1 / 2);
-
-        // 1890 clilent connected 3rd minute
-        metrics.metrics[0].connectedClients = 1890;
-        jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionsLoad1min).toBe(1890 / 3);
-
-        // no changes for 5m 1h and 1day
-        expect(metrics.metrics[0].connectionsLoad1min).toBe(1890 / 3);
-        expect(metrics.metrics[0].connectionsLoad5min).toBe(0);
-        expect(metrics.metrics[0].connectionsLoad15min).toBe(0);
-        expect(metrics.metrics[0].connectionsLoad1hour).toBe(0);
-        expect(metrics.metrics[0].connectionsLoad1day).toBe(0);
+        expect(moveAverageSpy).toBeCalledTimes(2);
     });
 
-    it("Should compute metrics connectionsLoad5min for anonymous registered tenants", () => {
+    it("Should test compute connectionsLoad15min movingAverage function", () => {
         const metrics = new moscaMestrics.Metrics();
-
+        const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad5min, 'movingAverage');
+        
         // anonymouns index is 0, is the fisrt tenant registered
         jest.runOnlyPendingTimers();
 
-        // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionsLoad5min).toBe(0);
+        // no clilent connected
+        expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 1564 clilent connected after 5ve
-        metrics.metrics[0].connectedClients = 1564;
-        metrics.metricsCallbacks.anonymous.count = 4; // have been expired 4
-
-        jest.runOnlyPendingTimers(); // expired 5 for the first time
-        expect(metrics.metrics[0].connectionsLoad5min).toBe(1564 / (metrics.metricsCallbacks.anonymous.count / 5));
-
-         // 18744 clilent connected after 5ve
-         metrics.metrics[0].connectedClients = 18744;
-         metrics.metricsCallbacks.anonymous.count = 9; // have been expired 9
-
-         jest.runOnlyPendingTimers();
-         expect(metrics.metrics[0].connectionsLoad5min).toBe(18744 / (metrics.metricsCallbacks.anonymous.count / 5));
-         expect(metrics.metrics[0].connectionsLoad15min).toBe(0);
-         expect(metrics.metrics[0].connectionsLoad1hour).toBe(0);
-         expect(metrics.metrics[0].connectionsLoad1day).toBe(0);
+        // 1 clilent connected
+        metrics.metrics[0].connectedClients = 1;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
+        jest.runOnlyPendingTimers();
+        expect(moveAverageSpy).toBeCalledTimes(2);
     });
 
-    it("Should compute metrics connectionsLoad15min for anonymous registered tenants", () => {
+    it("Should test compute connectionsLoad15min movingAverage function", () => {
         const metrics = new moscaMestrics.Metrics();
-
+        const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad15min, 'movingAverage');
+        
         // anonymouns index is 0, is the fisrt tenant registered
         jest.runOnlyPendingTimers();
 
-        // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionsLoad15min).toBe(0);
+        // no clilent connected
+        expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 15641 clilent connected
-        metrics.metrics[0].connectedClients = 15641;
-        metrics.metricsCallbacks.anonymous.count = 14;
-
+        // 1 clilent connected
+        metrics.metrics[0].connectedClients = 1;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
         jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionsLoad15min).toBe(15641 / (metrics.metricsCallbacks.anonymous.count / 15));
-
-         // 575154544 clilent connected
-         metrics.metrics[0].connectedClients = 575154544;
-         metrics.metricsCallbacks.anonymous.count = 29;
-
-         jest.runOnlyPendingTimers();
-         expect(metrics.metrics[0].connectionsLoad15min).toBe(575154544 / (metrics.metricsCallbacks.anonymous.count / 15));
-         expect(metrics.metrics[0].connectionsLoad1hour).toBe(0);
-         expect(metrics.metrics[0].connectionsLoad1day).toBe(0);
+        expect(moveAverageSpy).toBeCalledTimes(2);
     });
 
-    it("Should compute metrics connectionsLoad1hour for anonymous registered tenants", () => {
+    it("Should test compute connectionsLoad1hour movingAverage function", () => {
         const metrics = new moscaMestrics.Metrics();
-
+        const moveAverageSpy = jest.spyOn(metrics.metricsCallbacks.anonymous.connectionsLoad1hour, 'movingAverage');
+        
         // anonymouns index is 0, is the fisrt tenant registered
         jest.runOnlyPendingTimers();
 
-        // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionsLoad1hour).toBe(0);
+        // no clilent connected
+        expect(moveAverageSpy).toBeCalledTimes(1);
 
-        // 120 clilent connected
-        metrics.metrics[0].connectedClients = 120;
-        metrics.metricsCallbacks.anonymous.count = 59;
-
+        // 1 clilent connected
+        metrics.metrics[0].connectedClients = 1;
+        metrics.metricsCallbacks.anonymous.lastIntervalConnectedClients = 1;
         jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionsLoad1hour).toBe(120 / (metrics.metricsCallbacks.anonymous.count / 60));
-
-         // 4567787 clilent connected
-         metrics.metrics[0].connectedClients = 4567787;
-         metrics.metricsCallbacks.anonymous.count = 119;
-
-         jest.runOnlyPendingTimers();
-         expect(metrics.metrics[0].connectionsLoad1hour).toBe(4567787 / (metrics.metricsCallbacks.anonymous.count / 60));
-         expect(metrics.metrics[0].connectionsLoad1day).toBe(0);
-    });
-
-    it("Should compute metrics connectionsLoad1day for anonymous registered tenants", () => {
-        const metrics = new moscaMestrics.Metrics();
-
-        // anonymouns index is 0, is the fisrt tenant registered
-        jest.runOnlyPendingTimers();
-
-        // no clilent connected 1rst minute
-        expect(metrics.metrics[0].connectionsLoad1day).toBe(0);
-
-        // 3467 clilent connected
-        metrics.metrics[0].connectedClients = 3467;
-        metrics.metricsCallbacks.anonymous.count = 1439;
-
-        jest.runOnlyPendingTimers();
-        expect(metrics.metrics[0].connectionsLoad1day).toBe(3467 / (metrics.metricsCallbacks.anonymous.count / 1440));
-
-         // 45284841574 clilent connected
-         metrics.metrics[0].connectedClients = 45284841574;
-         metrics.metricsCallbacks.anonymous.count = 2879;
-
-         jest.runOnlyPendingTimers();
-         expect(metrics.metrics[0].connectionsLoad1day).toBe(45284841574 / (metrics.metricsCallbacks.anonymous.count / 1440));
+        expect(moveAverageSpy).toBeCalledTimes(2);
     });
 });

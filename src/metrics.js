@@ -231,9 +231,6 @@ class Metrics {
         this.metrics[tenantIndex][dataKey] += payload[dataKey];
         this.metricsCallbacks[tenant].lastIntervalConnectedClients += payload[dataKey];
 
-        if(dataKey === 'connectedClients') {
-          console.log('connectedClients');
-        }
       }
     } catch (error) {
       logger.warn(`Error ${error} preparing payload Object`, TAG);
