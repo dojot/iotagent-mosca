@@ -8,33 +8,56 @@ const logger = require("@dojot/dojot-module-logger").logger;
 
 const TAG = {filename: "app"};
 
-var isInitialized = false;
-var httpServer;
+let isInitialized = false;
+let httpServer;
+let app = null;
+
+function setInitialized(_isInitialized) {
+    isInitialized = _isInitialized;
+}
+
+function getInitialized() {
+    return isInitialized;
+}
+
+function setHttpServer(_httpServer) {
+    httpServer = _httpServer;
+}
+
+function getHttpServer() {
+    return httpServer;
+}
 
 function initApp(healthChecker, metricStore) {
-    const app = express();
-
+    app = express();
     app.use(bodyParser.json());
-    app.use(healthCheck.getHTTPRouter(healthChecker));
-    app.use(metrics.getHTTPRouter(metricStore));
+    if (healthChecker) {
+        app.use(healthCheck.getHTTPRouter(healthChecker));
+    }
+    if (metricStore) {
+        app.use(metrics.getHTTPRouter(metricStore));
+    }
     app.use(dojot.getHTTPRouter());
 
     logger.debug("Initializing configuration endpoints...", TAG);
 
-    httpServer = app.listen(10001, () => {
+    setHttpServer(app.listen(10001, () => {
         logger.info(`Listening on port 10001.`, TAG);
-        isInitialized = true;
-    });
+        setInitialized(true);
+    }));
+
     logger.debug("... configuration endpoints were initialized", TAG);
 }
 
 function stopApp() {
-    if(isInitialized) {
-        httpServer.close();
+    if (getInitialized()) {
+        getHttpServer().close();
+        isInitialized = false;
     }
 }
 
+
 module.exports = {
-    initApp, stopApp
+    initApp, stopApp, app, setInitialized, setHttpServer
 };
 

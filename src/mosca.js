@@ -1,17 +1,21 @@
 "use strict";
 const mosca = require("mosca");
-const config = require("./config");
+const tls = require("tls");
+const fs = require('fs');
+const defaultConfig = require("./config");
 const logger = require("@dojot/dojot-module-logger").logger;
 const util = require("util");
+const Certificates = require("./certificates");
 
 const TAG = { filename: "mqtt-backend"};
-const logLevel = config.logger.level;
+const logLevel = defaultConfig.logger.level;
 
 /**
  * Class responsible for MQTT backend operations.
  */
 class MqttBackend {
-  constructor(agent) {
+  constructor(agent, userConfig) {
+    const config = userConfig || defaultConfig;
     // Mosca Settings
     var moscaInterfaces = [];
 
@@ -23,6 +27,7 @@ class MqttBackend {
         keyPath: config.mosca_tls.key,
         certPath: config.mosca_tls.cert,
         caPaths: [config.mosca_tls.ca],
+        crl: fs.readFile(config.mosca_tls.crl),
         requestCert: true, // enable requesting certificate from clients
         rejectUnauthorized: true // only accept clients with valid certificate
       }
@@ -30,7 +35,7 @@ class MqttBackend {
     moscaInterfaces.push(mqtts);
 
     // optional
-    if (config.allow_unsecured_mode === 'true') {
+    if (config.allow_unsecured_mode === true) {
       var mqtt = {
         type: "mqtt",
         port: 1883
@@ -57,6 +62,8 @@ class MqttBackend {
     };
 
     this.cache = new Map();
+    //Keeps timeout objects for a tenant:device
+    this.maxLifetimeTimeoutTLS = new Map();
     this.agent = agent;
     this.server = new mosca.Server(moscaSettings);
 
@@ -120,12 +127,12 @@ class MqttBackend {
     const boundProcessMessage = this._processMessage.bind(this);
     this.server.on("published", boundProcessMessage);
     // Fired when a client connects to mosca server
-    this.server.on('clientConnected', (client) => {
+    this.server.on("clientConnected", (client) => {
       logger.info(`Client connected: ${client.id}`, TAG);
     });
 
     // Fired when a client disconnects from mosca server
-    this.server.on('clientDisconnected', (client) => {
+    this.server.on("clientDisconnected", (client) => {
       logger.info(`Client disconnected: ${client.id}`, TAG);
       this.cache.delete(client.id);
     });
@@ -141,6 +148,20 @@ class MqttBackend {
    */
   _getTopicParameter(topic, index) {
     return topic.split('/')[index];
+  }
+
+  /**
+   * Check received payload size
+   *
+   * @param {obj} data data received *must be a string
+   * @param {Number} size number of bytes to compare
+   *
+   * @returns {boolean} true if data length is less or equal than size
+   */
+  _checkPayloadSize(data, size) {
+    const len = data.length;
+    logger.debug(`Received a message with ${len} bytes`, TAG);
+    return (data.length <= size);
   }
 
   /**
@@ -160,12 +181,29 @@ class MqttBackend {
     }
 
     const topicType = packet.topic.split('/')[0];
-      // publish metrics topics
+    const payloadAsString = packet.payload.toString();
+
+    // publish metrics topics
     if (topicType === '$SYS') {
-      this.agentCallbackInternal(packet.topic, packet.payload);
+      const payloadSizeChecked = this._checkPayloadSize(payloadAsString, defaultConfig.DojotToDevicePayloadSize);
+
+      if (payloadSizeChecked) {
+        this.agentCallbackInternal(packet.topic, packet.payload);
+      }
+      else {
+        logger.warn('Received Message too long from dojot', TAG);
+      }
+
       return;
     } else if ((client === undefined) || (client === null)) {
       logger.debug(`No MQTT client was created. Bailing out.`, TAG);
+      return;
+    }
+
+    const payloadSizeChecked = this._checkPayloadSize(payloadAsString, defaultConfig.deviceToDojotPayloadSize);
+
+    if (!payloadSizeChecked) {
+      logger.warn('Received Message too long', TAG);
       return;
     }
 
@@ -226,8 +264,6 @@ class MqttBackend {
         return { tenant: parsedTopic[1], device: parsedTopic[2] };
       }
     }
-
-    return;
   }
 
   /**
@@ -256,7 +292,7 @@ class MqttBackend {
     logger.debug(`Trying to retrieve tenant and device ID...`, TAG);
     let ids = this.parseClientIdOrTopic(client.id);
     if (!ids) {
-      if (client.connection.stream.hasOwnProperty("TLSSocket")) {
+      if (client.connection.stream instanceof tls.TLSSocket) {
         // reject client connection
         logger.debug(`... could not get tenant and device ID.`, TAG);
         logger.warn(`Connection rejected for ${client.id} due to invalid client ID.`, TAG);
@@ -277,26 +313,37 @@ class MqttBackend {
 
     // Condition 2: Client certificate belongs to the
     // device identified in the clientId
-    // TODO: the clientId must contain the tenant too!
     logger.debug(`Checking its certificates...`, TAG);
-    if (client.connection.stream.hasOwnProperty("TLSSocket")) {
+    if (client.connection.stream instanceof tls.TLSSocket) {
       const clientCertificate = client.connection.stream.getPeerCertificate();
       if (
-        !clientCertificate.hasOwnProperty("subject") ||
-        !clientCertificate.subject.hasOwnProperty("CN") ||
-        clientCertificate.subject.CN !== ids.device
-      ) {
+          !clientCertificate.hasOwnProperty("subject") ||
+          !clientCertificate.subject.hasOwnProperty("CN") ||
+          clientCertificate.subject.CN !== `${ids.tenant}:${ids.device}`) {
+
         // reject client connection
         logger.debug(`... client certificate is invalid.`, TAG);
-        logger.warn(`Connection rejected for ${client.id} due to invalid client certificate.`);
+        logger.warn(`Connection rejected for ${client.id} due to invalid client certificate.`, TAG);
+        callback(null, false);
+
+        return;
+        //If null the CRL will not be updated after initialization, so verification is not required.
+      } else if (defaultConfig.mosca_tls.crlUpdateTime &&
+          (!clientCertificate.hasOwnProperty("serialNumber") ||
+              Certificates.hasRevoked(clientCertificate.serialNumber))) {
+        // reject client connection
+        logger.debug(`... client certificate has been Revoked or without serialNumber.`, TAG);
+        logger.warn(`Connection rejected for ${client.id} due to revoked client certificate or without serialNumber.`, TAG);
         callback(null, false);
         return;
       }
     }
     logger.debug(`... client certificate was successfully retrieved and it is valid.`, TAG);
 
+
     // Condition 3: Device exists in dojot
     logger.debug(`Checking whether this device exists in dojot...`, TAG);
+
     this.agent
       .getDevice(ids.device, ids.tenant)
       .then(() => {
@@ -311,7 +358,13 @@ class MqttBackend {
         //authorize client connection
         logger.debug(`... cache entry added.`, TAG);
         logger.info(`Connection authorized for ${client.id}.`, TAG);
+
+        this._tlsIdleTimeout(client, ids.tenant, ids.device);
+
+        this._tlsMaxLifetime(client, ids.tenant, ids.device);
+
         callback(null, true);
+
       })
       .catch(error => {
         //reject client connection
@@ -323,6 +376,52 @@ class MqttBackend {
     logger.debug(`... device check was requested.`, TAG);
   }
 
+
+    /**
+     * If the connection is Inactivity for a time defined by the environment variable
+     * (The idle timeout for a connection in ms) will disconnect .
+     * @param client
+     * @param tenant
+     * @param deviceId
+     * @private
+     */
+    _tlsIdleTimeout(client, tenant, deviceId) {
+      if (client.connection.stream instanceof tls.TLSSocket) {
+        const idleTimeout = defaultConfig.mosca_tls.idleTimeout;
+        if (idleTimeout) {
+          logger.debug(`Set timeout ${idleTimeout} ms by Idle for ${client.id} ...`, TAG);
+          client.connection.stream.setTimeout(idleTimeout);
+          client.connection.stream.on('timeout', () => {
+            logger.info(`Timeout for Idle connection ${client.id}.`, TAG);
+            this.disconnectDevice(tenant, deviceId);
+          });
+          logger.debug(`... adding timeout  by Idle was successfully for ${client.id}.`, TAG);
+        }
+      }
+    }
+
+    /**
+     * If the connection is open for a time defined by the environment variable
+     * (Maximum lifetime of a connection in ms )  will disconnect .
+     *
+     * @param client
+     * @param tenant
+     * @param deviceId
+     * @private
+     */
+    _tlsMaxLifetime(client, tenant, deviceId) {
+      if (client.connection.stream instanceof tls.TLSSocket) {
+        const maxLifetime = defaultConfig.mosca_tls.maxLifetime;
+        if (maxLifetime) {
+          logger.debug(`Set timeout ${maxLifetime} ms by lifetime for ${client.id} ...`, TAG);
+          this.maxLifetimeTimeoutTLS.set(client.id, setTimeout(() => {
+            logger.info(`TlS connection disconnect  ${client.id} because of Max Lifetime.`, TAG);
+            this.disconnectDevice(tenant, deviceId);
+          }, maxLifetime));
+          logger.debug(`... adding timeout  by lifetime was successfully for ${client.id}.`, TAG);
+        }
+      }
+    }
 
   /**
    * Check authorization when a MQTT client wants to publish something or
@@ -348,7 +447,7 @@ class MqttBackend {
    * @param {function} callback The callback to be executed when the decision is
    * made
    */
-  _checkAuthorization(client, topic, tag, callback) {
+  async _checkAuthorization(client, topic, tag, callback) {
     logger.debug(`Authorizing MQTT client ${client.id} to publish to ${topic}`, TAG);
 
     logger.debug(`Retrieving cache entry...`, TAG);
@@ -388,7 +487,7 @@ class MqttBackend {
       logger.warn(`This behavior will be deprecated in the future.`, TAG);
       logger.warn(`Checking whether this device exists in dojot...`, TAG);
       // Device exists in dojot
-      this.agent.getDevice(ids.device, ids.tenant)
+      await this.agent.getDevice(ids.device, ids.tenant)
         .then(() => {
           logger.warn(`... device exists in dojot.`, TAG);
           logger.warn(`Adding it to the cache...`, TAG);
@@ -403,7 +502,7 @@ class MqttBackend {
           logger.warn(`Connection was rejected and device doesn't exist. Really?`, TAG);
           logger.warn(`Error is: ${error}.`, TAG);
           callback(null, false);
-          return;
+
         });
     }
 
@@ -460,6 +559,14 @@ class MqttBackend {
       logger.debug(`Removing it from cache...`, TAG);
       this.cache.delete(key);
       logger.debug(`... device was successfully removed from cache.`, TAG);
+
+      //If there is a scheduled timeout cancel it.
+      if(this.maxLifetimeTimeoutTLS.has(key)) {
+        logger.debug(`Removing timeout by lifetime for ${key} ...`, TAG);
+        clearTimeout(this.maxLifetimeTimeoutTLS.get(key));
+        this.maxLifetimeTimeoutTLS.delete(key);
+        logger.debug(`... removing timeout  by lifetime was successfully for ${key}.`, TAG);
+      }
     }
     // (backward compatibility)
     else {
@@ -479,6 +586,8 @@ class MqttBackend {
       this.cache.delete(clientId);
     }
     logger.debug(`... device was successfully disconnected from broker.`, TAG);
+
+    return cacheEntry;
   }
 }
 
