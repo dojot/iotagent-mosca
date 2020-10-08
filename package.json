@@ -1,6 +1,6 @@
 {
   "name": "@dojot/iotagent-mqtt",
-  "version": "0.3.0-beta.2",
+  "version": "0.3.0-beta.3",
   "description": "An IoT agent for MQTT with JSON payload",
   "main": "index.js",
   "bin": "index.js",
