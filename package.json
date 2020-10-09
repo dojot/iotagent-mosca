@@ -7,7 +7,9 @@
   "scripts": {
     "test": "jest tests/unit-tests/*.test.js --coverage",
     "start": "node src/index.js",
-    "docs": "jsdoc -R ./README.md -p ./package.json -r -d ./docs --access all ./lib -c ./jsdoc.conf"
+    "docs": "jsdoc -R ./README.md -p ./package.json -r -d ./docs --access all ./lib -c ./jsdoc.conf",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
   },
   "repository": {
     "type": "git",
@@ -32,7 +34,8 @@
     "express": "4.16.3",
     "mosca": "^2.8.0",
     "openssl-nodejs": "^1.0.5",
-    "redis": "^2.8.0"
+    "redis": "^2.8.0",
+    "snyk": "^1.316.1"
   },
   "devDependencies": {
     "assume": "^2.1.0",
@@ -53,5 +56,6 @@
       "src/**/*.js",
       "!src/index.js"
     ]
-  }
+  },
+  "snyk": true
 }
