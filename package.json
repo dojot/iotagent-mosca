@@ -25,7 +25,7 @@
   "homepage": "https://github.com/dojot/iotagent-mosca/#readme",
   "license": "GPL-3.0",
   "dependencies": {
-    "@dojot/dojot-module-logger": "0.0.1-alpha.5",
+    "@dojot/dojot-module-logger": "0.1.0",
     "@dojot/healthcheck": "^0.0.1-alpha",
     "@dojot/iotagent-nodejs": "^2.1.0-beta.10",
     "cron": "^1.7.2",
