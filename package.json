@@ -36,7 +36,7 @@
     "@dojot/healthcheck": "^0.1.0",
     "@dojot/iotagent-nodejs": "^2.2.0",
     "cron": "^1.7.2",
-    "express": "4.16.3",
+    "express": "4.17.1",
     "mosca": "^2.8.0",
     "openssl-nodejs": "^1.0.5",
     "redis": "^2.8.0"
